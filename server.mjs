@@ -46,10 +46,15 @@ function compactNumber(value) {
   return String(value);
 }
 
+function thumbnailUrl(youtubeId, quality = "hqdefault") {
+  return `https://img.youtube.com/vi/${youtubeId}/${quality}.jpg`;
+}
+
 function presentVideo(video) {
   return {
     ...video,
     views: formatViews(video.viewCount, video.category === "Live"),
+    thumbnail: video.thumbnail || thumbnailUrl(video.youtubeId),
     commentCount: video.comments.length,
   };
 }
@@ -58,6 +63,7 @@ function presentShort(short) {
   return {
     ...short,
     views: formatViews(short.viewCount),
+    thumbnail: short.thumbnail || thumbnailUrl(short.youtubeId),
   };
 }
 

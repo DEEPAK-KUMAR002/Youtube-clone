@@ -1,0 +1,13 @@
+{
+  "name": "virello",
+  "version": "1.0.0",
+  "description": "A YouTube-style video app with a Node.js backend and real YouTube playback.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

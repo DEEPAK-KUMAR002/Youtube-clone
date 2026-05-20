@@ -5,6 +5,11 @@ const api = {
     if (!response.ok) throw new Error("API unavailable");
     return response.json();
   },
+  async getVideo(id) {
+    const response = await fetch(`/api/videos/${id}`);
+    if (!response.ok) throw new Error("Video unavailable");
+    return response.json();
+  },
   async countView(id) {
     const response = await fetch(`/api/videos/${id}/views`, { method: "POST" });
     if (!response.ok) throw new Error("View update failed");
@@ -27,34 +32,46 @@ const api = {
 };
 
 const fallbackState = {
-  categories: ["All", "Design", "Music", "Gaming", "Podcasts", "Live", "JavaScript", "Cooking", "Travel", "News", "Recently uploaded"],
-  featured: {
-    id: "featured-dashboard",
-    title: "Build Room: Designing a Creator Dashboard",
-    channel: "Creator Lab Live",
-    viewsLabel: "128K watching",
-    thumb: "linear-gradient(155deg, #304f9c 0%, #845ec2 42%, #ff6f59 100%)",
-  },
+  categories: ["All", "Music", "Learning", "Gaming", "JavaScript", "Travel", "Cooking", "News", "Live", "Recently uploaded"],
+  featured: null,
   videos: [],
   shorts: [],
 };
 
-const chipsEl = document.querySelector("#chips");
-const gridEl = document.querySelector("#videoGrid");
-const shortsEl = document.querySelector("#shortsRow");
-const resultCount = document.querySelector("#resultCount");
-const searchInput = document.querySelector("#searchInput");
-const playerModal = document.querySelector("#playerModal");
-const playerScreen = document.querySelector("#playerScreen");
-const playerTitle = document.querySelector("#playerTitle");
-const playerChannel = document.querySelector("#playerChannel");
-const likeButton = document.querySelector("#likeButton");
-const likeCount = document.querySelector("#likeCount");
-const commentCount = document.querySelector("#commentCount");
-const commentsList = document.querySelector("#commentsList");
-const commentForm = document.querySelector("#commentForm");
-const commentName = document.querySelector("#commentName");
-const commentText = document.querySelector("#commentText");
+const els = {
+  shell: document.querySelector(".shell"),
+  sidebar: document.querySelector("#sidebar"),
+  homeView: document.querySelector("#homeView"),
+  watchView: document.querySelector("#watchView"),
+  homeLink: document.querySelector("#homeLink"),
+  chips: document.querySelector("#chips"),
+  videoGrid: document.querySelector("#videoGrid"),
+  shortsRow: document.querySelector("#shortsRow"),
+  resultCount: document.querySelector("#resultCount"),
+  searchForm: document.querySelector("#searchForm"),
+  searchInput: document.querySelector("#searchInput"),
+  featuredThumb: document.querySelector("#featuredThumb"),
+  featuredTitle: document.querySelector("#featuredTitle"),
+  featuredDescription: document.querySelector("#featuredDescription"),
+  watchFeatured: document.querySelector("#watchFeatured"),
+  watchFeaturedAction: document.querySelector("#watchFeaturedAction"),
+  copyLinkButton: document.querySelector("#copyLinkButton"),
+  watchTitle: document.querySelector("#watchTitle"),
+  watchAvatar: document.querySelector("#watchAvatar"),
+  watchChannel: document.querySelector("#watchChannel"),
+  watchSubscribers: document.querySelector("#watchSubscribers"),
+  watchViews: document.querySelector("#watchViews"),
+  watchDescription: document.querySelector("#watchDescription"),
+  likeButton: document.querySelector("#likeButton"),
+  likeCount: document.querySelector("#likeCount"),
+  shareButton: document.querySelector("#shareButton"),
+  commentCount: document.querySelector("#commentCount"),
+  commentForm: document.querySelector("#commentForm"),
+  commentName: document.querySelector("#commentName"),
+  commentText: document.querySelector("#commentText"),
+  commentsList: document.querySelector("#commentsList"),
+  watchRecommendations: document.querySelector("#watchRecommendations"),
+};
 
 let categories = [];
 let videos = [];
@@ -63,9 +80,17 @@ let featured = null;
 let activeCategory = "All";
 let activeQuery = "";
 let activeVideo = null;
+let player = null;
+let playerApiReady = false;
+let pendingVideoId = null;
+
+window.onYouTubeIframeAPIReady = () => {
+  playerApiReady = true;
+  if (pendingVideoId) loadPlayer(pendingVideoId);
+};
 
 function escapeHtml(value) {
-  return String(value)
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -74,20 +99,36 @@ function escapeHtml(value) {
 }
 
 function compactNumber(value) {
-  if (value >= 1000000) return `${Number((value / 1000000).toFixed(1))}M`;
-  if (value >= 1000) return `${Number((value / 1000).toFixed(1))}K`;
-  return String(value);
+  const count = Number(value || 0);
+  if (count >= 1000000000) return `${Number((count / 1000000000).toFixed(1))}B`;
+  if (count >= 1000000) return `${Number((count / 1000000).toFixed(1))}M`;
+  if (count >= 1000) return `${Number((count / 1000).toFixed(1))}K`;
+  return String(count);
 }
 
 function viewLabel(count, live = false) {
   return `${compactNumber(count)} ${live ? "watching" : "views"}`;
 }
 
+function thumbnailUrl(youtubeId, quality = "hqdefault") {
+  return `https://img.youtube.com/vi/${youtubeId}/${quality}.jpg`;
+}
+
+function initials(name) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function presentVideo(video) {
   return {
     ...video,
     views: viewLabel(video.viewCount, video.category === "Live"),
-    commentCount: video.comments.length,
+    thumbnail: video.thumbnail || thumbnailUrl(video.youtubeId),
+    commentCount: (video.comments || []).length,
   };
 }
 
@@ -95,6 +136,7 @@ function presentShort(short) {
   return {
     ...short,
     views: viewLabel(short.viewCount),
+    thumbnail: short.thumbnail || thumbnailUrl(short.youtubeId),
   };
 }
 
@@ -107,29 +149,134 @@ function filterFallbackVideos(items) {
   });
 }
 
-function initials(name) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function loadPlayer(youtubeId) {
+  pendingVideoId = youtubeId;
+  if (!playerApiReady || !window.YT?.Player) {
+    document.querySelector("#youtubePlayer").innerHTML = `
+      <iframe
+        src="https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=1&rel=0&modestbranding=1"
+        title="YouTube video player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen>
+      </iframe>
+    `;
+    return;
+  }
+
+  if (!player) {
+    document.querySelector("#youtubePlayer").innerHTML = "";
+    player = new YT.Player("youtubePlayer", {
+      videoId: youtubeId,
+      playerVars: {
+        autoplay: 1,
+        controls: 1,
+        modestbranding: 1,
+        rel: 0,
+      },
+    });
+    return;
+  }
+
+  player.loadVideoById(youtubeId);
 }
 
-function createThumbnail(video) {
-  return `
-    <div class="thumb" style="--thumb-bg: ${escapeHtml(video.thumb)}">
-      <div class="visual-block"></div>
-      <div class="visual-lines"><span></span><span></span><span></span></div>
-      <span class="duration">${escapeHtml(video.duration)}</span>
-    </div>
-  `;
+function showHome() {
+  els.homeView.hidden = false;
+  els.watchView.hidden = true;
+  document.body.classList.remove("watching");
+  history.replaceState(null, "", location.pathname);
+  if (player?.stopVideo) player.stopVideo();
+}
+
+function showWatch() {
+  els.homeView.hidden = true;
+  els.watchView.hidden = false;
+  document.body.classList.add("watching");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderFeatured() {
+  if (!featured) return;
+  const item = presentVideo(featured);
+  els.featuredThumb.src = item.thumbnail;
+  els.featuredThumb.alt = item.title;
+  els.featuredTitle.textContent = item.title;
+  els.featuredDescription.textContent = item.description;
+}
+
+function renderChips() {
+  els.chips.innerHTML = categories
+    .map((category) => `<button class="chip${category === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`)
+    .join("");
+}
+
+function renderVideos() {
+  els.resultCount.textContent = `${videos.length} video${videos.length === 1 ? "" : "s"}`;
+  els.videoGrid.innerHTML = videos.length
+    ? videos
+        .map(
+          (video) => `
+            <button class="video-card" type="button" data-video-id="${escapeHtml(video.id)}">
+              <span class="thumb">
+                <img src="${escapeHtml(video.thumbnail)}" alt="${escapeHtml(video.title)}" loading="lazy" />
+                <span class="duration">${escapeHtml(video.duration)}</span>
+              </span>
+              <footer>
+                <span class="channel-avatar" style="--avatar-bg: ${escapeHtml(video.avatar)}">${escapeHtml(initials(video.channel))}</span>
+                <div class="video-info">
+                  <h3 class="video-title">${escapeHtml(video.title)}</h3>
+                  <p class="video-channel">${escapeHtml(video.channel)}</p>
+                  <p class="meta-line"><span>${escapeHtml(video.views)}</span><span>-</span><span>${escapeHtml(video.age)}</span></p>
+                </div>
+              </footer>
+            </button>
+          `
+        )
+        .join("")
+    : `<p class="empty-state">No videos found. Try a broader search.</p>`;
+}
+
+function renderShorts() {
+  els.shortsRow.innerHTML = shorts
+    .map(
+      (short) => `
+        <button class="short-card" type="button" data-short-id="${escapeHtml(short.id)}">
+          <span class="short-thumb">
+            <img src="${escapeHtml(short.thumbnail)}" alt="${escapeHtml(short.title)}" loading="lazy" />
+          </span>
+          <h3>${escapeHtml(short.title)}</h3>
+          <p class="short-meta">${escapeHtml(short.views)}</p>
+        </button>
+      `
+    )
+    .join("");
+}
+
+function renderRecommendations() {
+  const items = videos.filter((video) => video.id !== activeVideo?.id).slice(0, 8);
+  els.watchRecommendations.innerHTML = items
+    .map(
+      (video) => `
+        <button class="recommendation" type="button" data-video-id="${escapeHtml(video.id)}">
+          <span class="recommendation-thumb">
+            <img src="${escapeHtml(video.thumbnail)}" alt="${escapeHtml(video.title)}" loading="lazy" />
+            <span>${escapeHtml(video.duration)}</span>
+          </span>
+          <span class="recommendation-info">
+            <strong>${escapeHtml(video.title)}</strong>
+            <small>${escapeHtml(video.channel)}</small>
+            <small>${escapeHtml(video.views)} - ${escapeHtml(video.age)}</small>
+          </span>
+        </button>
+      `
+    )
+    .join("");
 }
 
 function renderComments(video) {
   const comments = video.comments || [];
-  commentCount.textContent = `${comments.length} comment${comments.length === 1 ? "" : "s"}`;
-  commentsList.innerHTML = comments.length
+  els.commentCount.textContent = `${comments.length} comment${comments.length === 1 ? "" : "s"}`;
+  els.commentsList.innerHTML = comments.length
     ? comments
         .map(
           (comment) => `
@@ -143,70 +290,48 @@ function renderComments(video) {
     : `<p class="empty-comments">No comments yet.</p>`;
 }
 
-async function openPlayer(video) {
-  activeVideo = video;
-  playerScreen.style.setProperty("--thumb-bg", video.thumb);
-  playerTitle.textContent = video.title;
-  playerChannel.textContent = `${video.channel} - ${video.views || video.viewsLabel}`;
-  likeCount.textContent = compactNumber(video.likes || 0);
-  renderComments(video);
-  playerModal.classList.add("open");
-  playerModal.setAttribute("aria-hidden", "false");
+function hydrateWatch(video) {
+  activeVideo = presentVideo(video);
+  document.title = `${activeVideo.title} - Virello`;
+  els.watchTitle.textContent = activeVideo.title;
+  els.watchAvatar.textContent = initials(activeVideo.channel);
+  els.watchAvatar.style.setProperty("--avatar-bg", activeVideo.avatar);
+  els.watchChannel.textContent = activeVideo.channel;
+  els.watchSubscribers.textContent = activeVideo.subscribers || "Virello channel";
+  els.watchViews.textContent = `${activeVideo.views} - ${activeVideo.age}`;
+  els.watchDescription.textContent = activeVideo.description;
+  els.likeCount.textContent = compactNumber(activeVideo.likes);
+  renderComments(activeVideo);
+  renderRecommendations();
+  showWatch();
+  loadPlayer(activeVideo.youtubeId);
+}
 
-  if (!video.isShort && !video.isFeatured) {
+async function openVideo(id, options = {}) {
+  const localVideo = videos.find((video) => video.id === id) || featured;
+  if (!localVideo) return;
+
+  let video = localVideo;
+  try {
+    video = await api.getVideo(id);
+  } catch {
+    video = localVideo;
+  }
+
+  hydrateWatch(video);
+  history.replaceState(null, "", `#watch=${encodeURIComponent(id)}`);
+
+  if (!options.skipView) {
     try {
-      const updated = await api.countView(video.id);
-      Object.assign(video, updated);
-      playerChannel.textContent = `${video.channel} - ${video.views}`;
+      const updated = await api.countView(id);
+      Object.assign(activeVideo, presentVideo(updated));
+      els.watchViews.textContent = `${activeVideo.views} - ${activeVideo.age}`;
     } catch {
-      video.viewCount = (video.viewCount || 0) + 1;
+      activeVideo.viewCount = (activeVideo.viewCount || 0) + 1;
+      activeVideo.views = viewLabel(activeVideo.viewCount, activeVideo.category === "Live");
+      els.watchViews.textContent = `${activeVideo.views} - ${activeVideo.age}`;
     }
   }
-}
-
-function renderVideos() {
-  resultCount.textContent = `${videos.length} video${videos.length === 1 ? "" : "s"}`;
-  gridEl.innerHTML = videos
-    .map(
-      (video) => `
-        <button class="video-card" type="button" data-video-id="${escapeHtml(video.id)}">
-          ${createThumbnail(video)}
-          <footer>
-            <span class="channel-avatar" style="--avatar-bg: ${escapeHtml(video.avatar)}">${escapeHtml(initials(video.channel))}</span>
-            <div class="video-info">
-              <h3 class="video-title">${escapeHtml(video.title)}</h3>
-              <p class="video-channel">${escapeHtml(video.channel)}</p>
-              <p class="meta-line"><span>${escapeHtml(video.views)}</span><span>-</span><span>${escapeHtml(video.age)}</span></p>
-            </div>
-          </footer>
-        </button>
-      `
-    )
-    .join("");
-
-  if (!videos.length) {
-    gridEl.innerHTML = `<p class="empty-state">No videos found. Try a broader search.</p>`;
-  }
-}
-
-function renderChips() {
-  chipsEl.innerHTML = categories
-    .map((category) => `<button class="chip${category === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`)
-    .join("");
-}
-
-function renderShorts() {
-  shortsEl.innerHTML = shorts
-    .map(
-      (short) => `
-        <button class="short-card" type="button" data-short-id="${escapeHtml(short.id)}">
-          <div class="short-thumb" style="--thumb-bg: ${escapeHtml(short.thumb)}"></div>
-          <h3>${escapeHtml(short.title)}</h3>
-          <p class="short-meta">${escapeHtml(short.views)}</p>
-        </button>
-      `
-    )
-    .join("");
 }
 
 async function refreshData() {
@@ -214,8 +339,8 @@ async function refreshData() {
     const data = await api.getBootstrap(activeCategory, activeQuery);
     categories = data.categories;
     featured = data.featured;
-    videos = data.videos;
-    shorts = data.shorts;
+    videos = data.videos.map(presentVideo);
+    shorts = data.shorts.map(presentShort);
   } catch {
     const response = await fetch("data/db.json");
     const data = response.ok ? await response.json() : fallbackState;
@@ -225,116 +350,130 @@ async function refreshData() {
     shorts = (data.shorts || []).map(presentShort);
   }
 
+  renderFeatured();
   renderChips();
   renderVideos();
   renderShorts();
+
+  const watchId = location.hash.startsWith("#watch=") ? decodeURIComponent(location.hash.replace("#watch=", "")) : "";
+  if (watchId && !activeVideo) openVideo(watchId, { skipView: true });
 }
 
-chipsEl.addEventListener("click", async (event) => {
+els.homeLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  document.title = "Virello";
+  activeVideo = null;
+  showHome();
+});
+
+els.chips.addEventListener("click", async (event) => {
   const chip = event.target.closest(".chip");
   if (!chip) return;
   activeCategory = chip.dataset.category;
   await refreshData();
 });
 
-gridEl.addEventListener("click", (event) => {
+els.videoGrid.addEventListener("click", (event) => {
   const card = event.target.closest(".video-card");
-  if (!card) return;
-  const video = videos.find((item) => item.id === card.dataset.videoId);
-  if (video) openPlayer(video);
+  if (card) openVideo(card.dataset.videoId);
 });
 
-shortsEl.addEventListener("click", (event) => {
+els.watchRecommendations.addEventListener("click", (event) => {
+  const card = event.target.closest(".recommendation");
+  if (card) openVideo(card.dataset.videoId);
+});
+
+els.shortsRow.addEventListener("click", (event) => {
   const card = event.target.closest(".short-card");
   if (!card) return;
   const short = shorts.find((item) => item.id === card.dataset.shortId);
-  if (!short) return;
-  openPlayer({
-    ...short,
-    channel: "Virello Shorts",
-    likes: 0,
-    comments: [],
-    isShort: true,
-  });
+  const video = videos.find((item) => item.youtubeId === short?.youtubeId) || featured;
+  if (video) openVideo(video.id);
 });
 
-document.querySelector("#watchFeatured").addEventListener("click", () => {
-  openPlayer({
-    ...featured,
-    views: featured.viewsLabel,
-    likes: 0,
-    comments: [],
-    isFeatured: true,
-  });
-});
+els.watchFeatured.addEventListener("click", () => featured && openVideo(featured.id));
+els.watchFeaturedAction.addEventListener("click", () => featured && openVideo(featured.id));
 
-document.querySelector("#searchForm").addEventListener("submit", async (event) => {
+els.searchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  activeQuery = searchInput.value;
+  activeQuery = els.searchInput.value;
+  await refreshData();
+  showHome();
+});
+
+els.searchInput.addEventListener("input", async () => {
+  activeQuery = els.searchInput.value;
   await refreshData();
 });
 
-searchInput.addEventListener("input", async () => {
-  activeQuery = searchInput.value;
-  await refreshData();
-});
-
-likeButton.addEventListener("click", async () => {
-  if (!activeVideo || activeVideo.isShort || activeVideo.isFeatured) return;
+els.likeButton.addEventListener("click", async () => {
+  if (!activeVideo) return;
   try {
     const updated = await api.likeVideo(activeVideo.id);
     activeVideo.likes = updated.likes;
   } catch {
     activeVideo.likes = (activeVideo.likes || 0) + 1;
+    localStorage.setItem(`virello-likes-${activeVideo.id}`, String(activeVideo.likes));
   }
-  likeCount.textContent = compactNumber(activeVideo.likes || 0);
+  els.likeCount.textContent = compactNumber(activeVideo.likes);
 });
 
-commentForm.addEventListener("submit", async (event) => {
+els.commentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!activeVideo || activeVideo.isShort || activeVideo.isFeatured) return;
+  if (!activeVideo) return;
 
   const payload = {
-    name: commentName.value,
-    text: commentText.value,
+    name: els.commentName.value,
+    text: els.commentText.value,
   };
 
   try {
     const comment = await api.addComment(activeVideo.id, payload);
     activeVideo.comments = [comment, ...(activeVideo.comments || [])];
   } catch {
-    activeVideo.comments = [
-      { id: `local-${Date.now()}`, name: payload.name || "Guest", text: payload.text },
-      ...(activeVideo.comments || []),
-    ];
+    const comment = {
+      id: `local-${Date.now()}`,
+      name: payload.name || "Guest",
+      text: payload.text,
+      createdAt: new Date().toISOString(),
+    };
+    activeVideo.comments = [comment, ...(activeVideo.comments || [])];
+    localStorage.setItem(`virello-comments-${activeVideo.id}`, JSON.stringify(activeVideo.comments));
   }
 
-  commentText.value = "";
+  els.commentText.value = "";
   renderComments(activeVideo);
 });
 
+els.shareButton.addEventListener("click", async () => {
+  const url = `${location.origin}${location.pathname}#watch=${encodeURIComponent(activeVideo?.id || "")}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    els.shareButton.lastChild.textContent = "Copied";
+    setTimeout(() => {
+      els.shareButton.lastChild.textContent = "Share";
+    }, 1200);
+  } catch {
+    prompt("Copy link", url);
+  }
+});
+
+els.copyLinkButton.addEventListener("click", async () => {
+  const url = `${location.origin}${location.pathname}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    els.copyLinkButton.textContent = "Copied";
+    setTimeout(() => {
+      els.copyLinkButton.textContent = "Copy link";
+    }, 1200);
+  } catch {
+    prompt("Copy link", url);
+  }
+});
+
 document.querySelector("#menuButton").addEventListener("click", () => {
-  document.querySelector("#sidebar").classList.toggle("collapsed");
-  document.querySelector(".shell").classList.toggle("nav-collapsed");
-});
-
-document.querySelector("#closePlayer").addEventListener("click", () => {
-  playerModal.classList.remove("open");
-  playerModal.setAttribute("aria-hidden", "true");
-});
-
-playerModal.addEventListener("click", (event) => {
-  if (event.target === playerModal) {
-    playerModal.classList.remove("open");
-    playerModal.setAttribute("aria-hidden", "true");
-  }
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && playerModal.classList.contains("open")) {
-    playerModal.classList.remove("open");
-    playerModal.setAttribute("aria-hidden", "true");
-  }
+  els.sidebar.classList.toggle("collapsed");
+  els.shell.classList.toggle("nav-collapsed");
 });
 
 refreshData();
