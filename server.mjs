@@ -85,6 +85,27 @@ function filterVideos(videos, url) {
   });
 }
 
+function slugify(value) {
+  return String(value || "video")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 42) || "video";
+}
+
+function getYouTubeId(value) {
+  const text = String(value || "").trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+  const patterns = [
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  const match = patterns.map((pattern) => text.match(pattern)).find(Boolean);
+  return match ? match[1] : "";
+}
+
 function resolvePath(urlPath) {
   const cleanPath = decodeURIComponent(urlPath.split("?")[0]);
   const requested = cleanPath === "/" ? "/index.html" : cleanPath;
@@ -115,6 +136,43 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && path === "/api/videos") {
     return json(res, 200, filterVideos(db.videos, url).map(presentVideo));
+  }
+
+  if (req.method === "POST" && path === "/api/videos") {
+    const body = await readBody(req);
+    const youtubeId = getYouTubeId(body.youtubeId || body.youtubeUrl);
+    const title = String(body.title || "").trim();
+    const channel = String(body.channel || "").trim();
+    if (!youtubeId || !title || !channel) {
+      return json(res, 400, { error: "YouTube URL, title, and channel are required" });
+    }
+
+    const baseId = slugify(title);
+    let id = baseId;
+    let suffix = 2;
+    while (db.videos.some((video) => video.id === id)) {
+      id = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+
+    const video = {
+      id,
+      youtubeId,
+      title: title.slice(0, 100),
+      channel: channel.slice(0, 50),
+      description: String(body.description || "Added through Virello Create.").trim().slice(0, 300),
+      viewCount: 0,
+      age: "Just now",
+      duration: String(body.duration || "YouTube").slice(0, 18),
+      category: db.categories.includes(body.category) ? body.category : "Recently uploaded",
+      avatar: "#2563eb",
+      likes: 0,
+      subscribers: "New channel",
+      comments: [],
+    };
+    db.videos.unshift(video);
+    await writeDb(db);
+    return json(res, 201, presentVideo(video));
   }
 
   if (req.method === "GET" && path === "/api/shorts") {

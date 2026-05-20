@@ -11,6 +11,7 @@ The deployed GitHub Pages version includes the playable frontend and static data
 ## Run Locally
 
 ```bash
+npm install
 npm start
 ```
 
@@ -26,6 +27,7 @@ The local server provides these JSON endpoints:
 - `GET /api/bootstrap`
 - `GET /api/videos?category=Learning&query=javascript`
 - `GET /api/shorts`
+- `POST /api/videos`
 - `POST /api/videos/:id/views`
 - `POST /api/videos/:id/likes`
 - `GET /api/videos/:id/comments`
@@ -42,5 +44,8 @@ Video, like, view, and comment data is stored in `data/db.json`.
 - Real YouTube iframe playback
 - YouTube-style watch page
 - Recommendation sidebar
+- Working Library, History, and Subscriptions views
+- Create flow for adding videos by YouTube URL or ID
+- Save, like, subscribe, share, and comment actions
 - Backend-powered views, likes, and comments
 - Collapsible side navigation

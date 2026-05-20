@@ -1,7 +1,6 @@
 const api = {
-  async getBootstrap(category = "All", query = "") {
-    const params = new URLSearchParams({ category, query });
-    const response = await fetch(`/api/bootstrap?${params}`);
+  async bootstrap() {
+    const response = await fetch("/api/bootstrap");
     if (!response.ok) throw new Error("API unavailable");
     return response.json();
   },
@@ -29,13 +28,15 @@ const api = {
     if (!response.ok) throw new Error("Comment failed");
     return response.json();
   },
-};
-
-const fallbackState = {
-  categories: ["All", "Music", "Learning", "Gaming", "JavaScript", "Travel", "Cooking", "News", "Live", "Recently uploaded"],
-  featured: null,
-  videos: [],
-  shorts: [],
+  async createVideo(video) {
+    const response = await fetch("/api/videos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(video),
+    });
+    if (!response.ok) throw new Error("Create video failed");
+    return response.json();
+  },
 };
 
 const els = {
@@ -44,9 +45,12 @@ const els = {
   homeView: document.querySelector("#homeView"),
   watchView: document.querySelector("#watchView"),
   homeLink: document.querySelector("#homeLink"),
+  navItems: document.querySelectorAll(".nav-item"),
+  createButton: document.querySelector("#createButton"),
   chips: document.querySelector("#chips"),
   videoGrid: document.querySelector("#videoGrid"),
   shortsRow: document.querySelector("#shortsRow"),
+  feedTitle: document.querySelector("#feedTitle"),
   resultCount: document.querySelector("#resultCount"),
   searchForm: document.querySelector("#searchForm"),
   searchInput: document.querySelector("#searchInput"),
@@ -62,32 +66,67 @@ const els = {
   watchSubscribers: document.querySelector("#watchSubscribers"),
   watchViews: document.querySelector("#watchViews"),
   watchDescription: document.querySelector("#watchDescription"),
+  subscribeButton: document.querySelector("#subscribeButton"),
   likeButton: document.querySelector("#likeButton"),
   likeCount: document.querySelector("#likeCount"),
   shareButton: document.querySelector("#shareButton"),
+  saveButton: document.querySelector("#saveButton"),
   commentCount: document.querySelector("#commentCount"),
   commentForm: document.querySelector("#commentForm"),
   commentName: document.querySelector("#commentName"),
   commentText: document.querySelector("#commentText"),
   commentsList: document.querySelector("#commentsList"),
   watchRecommendations: document.querySelector("#watchRecommendations"),
+  uploadModal: document.querySelector("#uploadModal"),
+  closeUpload: document.querySelector("#closeUpload"),
+  uploadForm: document.querySelector("#uploadForm"),
+  uploadYoutube: document.querySelector("#uploadYoutube"),
+  uploadTitle: document.querySelector("#uploadTitleInput"),
+  uploadChannel: document.querySelector("#uploadChannel"),
+  uploadCategory: document.querySelector("#uploadCategory"),
+  uploadDescription: document.querySelector("#uploadDescription"),
+  toast: document.querySelector("#toast"),
+};
+
+const fallbackState = {
+  categories: ["All", "Music", "Learning", "Gaming", "JavaScript", "Travel", "Cooking", "News", "Live", "Recently uploaded"],
+  featured: null,
+  videos: [],
+  shorts: [],
 };
 
 let categories = [];
-let videos = [];
+let allVideos = [];
+let visibleVideos = [];
 let shorts = [];
 let featured = null;
 let activeCategory = "All";
 let activeQuery = "";
+let activeMode = "home";
 let activeVideo = null;
-let player = null;
-let playerApiReady = false;
-let pendingVideoId = null;
+let searchTimer = null;
+let toastTimer = null;
 
 window.onYouTubeIframeAPIReady = () => {
-  playerApiReady = true;
-  if (pendingVideoId) loadPlayer(pendingVideoId);
+  window.virelloYouTubeApiReady = true;
 };
+
+function readSet(key) {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(key) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSet(key, set) {
+  localStorage.setItem(key, JSON.stringify([...set]));
+}
+
+const savedIds = readSet("virello:saved");
+const likedIds = readSet("virello:liked");
+const subscribedChannels = readSet("virello:subscribed");
+let historyIds = [...readSet("virello:history")];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -115,8 +154,9 @@ function thumbnailUrl(youtubeId, quality = "hqdefault") {
 }
 
 function initials(name) {
-  return name
+  return String(name || "V")
     .split(" ")
+    .filter(Boolean)
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
@@ -126,9 +166,9 @@ function initials(name) {
 function presentVideo(video) {
   return {
     ...video,
+    comments: video.comments || [],
     views: viewLabel(video.viewCount, video.category === "Live"),
     thumbnail: video.thumbnail || thumbnailUrl(video.youtubeId),
-    commentCount: (video.comments || []).length,
   };
 }
 
@@ -140,59 +180,74 @@ function presentShort(short) {
   };
 }
 
-function filterFallbackVideos(items) {
+function extractYouTubeId(value) {
+  const text = String(value || "").trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+  const patterns = [
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+  ];
+  const match = patterns.map((pattern) => text.match(pattern)).find(Boolean);
+  return match ? match[1] : "";
+}
+
+function slugify(value) {
+  return String(value || "video")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 42) || "video";
+}
+
+function showToast(message) {
+  clearTimeout(toastTimer);
+  els.toast.textContent = message;
+  els.toast.classList.add("show");
+  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1800);
+}
+
+function setActiveNav(nav) {
+  els.navItems.forEach((item) => item.classList.toggle("active", item.dataset.nav === nav));
+}
+
+function saveHistory(id) {
+  historyIds = [id, ...historyIds.filter((item) => item !== id)].slice(0, 30);
+  localStorage.setItem("virello:history", JSON.stringify(historyIds));
+}
+
+function titleForMode() {
+  if (activeQuery) return `Search results for "${activeQuery}"`;
+  if (activeMode === "library") return "Saved videos";
+  if (activeMode === "history") return "History";
+  if (activeMode === "subscriptions") return "Subscriptions";
+  if (activeCategory !== "All") return activeCategory;
+  return "Recommended";
+}
+
+function computeVisibleVideos() {
   const query = activeQuery.trim().toLowerCase();
-  return items.filter((video) => {
-    const categoryMatch = activeCategory === "All" || video.category === activeCategory || activeCategory === "Recently uploaded";
-    const queryMatch = [video.title, video.channel, video.category].some((value) => value.toLowerCase().includes(query));
-    return categoryMatch && queryMatch;
-  });
-}
+  let items = [...allVideos];
 
-function loadPlayer(youtubeId) {
-  pendingVideoId = youtubeId;
-  if (!playerApiReady || !window.YT?.Player) {
-    document.querySelector("#youtubePlayer").innerHTML = `
-      <iframe
-        src="https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=1&rel=0&modestbranding=1"
-        title="YouTube video player"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen>
-      </iframe>
-    `;
-    return;
+  if (activeMode === "library") {
+    items = items.filter((video) => savedIds.has(video.id));
+  } else if (activeMode === "history") {
+    const byId = new Map(items.map((video) => [video.id, video]));
+    items = historyIds.map((id) => byId.get(id)).filter(Boolean);
+  } else if (activeMode === "subscriptions") {
+    items = items.filter((video) => subscribedChannels.has(video.channel));
+  } else if (activeCategory !== "All") {
+    items = items.filter((video) => video.category === activeCategory || activeCategory === "Recently uploaded");
   }
 
-  if (!player) {
-    document.querySelector("#youtubePlayer").innerHTML = "";
-    player = new YT.Player("youtubePlayer", {
-      videoId: youtubeId,
-      playerVars: {
-        autoplay: 1,
-        controls: 1,
-        modestbranding: 1,
-        rel: 0,
-      },
-    });
-    return;
+  if (query) {
+    items = items.filter((video) =>
+      [video.title, video.channel, video.category, video.description].some((value) => String(value).toLowerCase().includes(query))
+    );
   }
 
-  player.loadVideoById(youtubeId);
-}
-
-function showHome() {
-  els.homeView.hidden = false;
-  els.watchView.hidden = true;
-  document.body.classList.remove("watching");
-  history.replaceState(null, "", location.pathname);
-  if (player?.stopVideo) player.stopVideo();
-}
-
-function showWatch() {
-  els.homeView.hidden = true;
-  els.watchView.hidden = false;
-  document.body.classList.add("watching");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  visibleVideos = items;
 }
 
 function renderFeatured() {
@@ -210,30 +265,39 @@ function renderChips() {
     .join("");
 }
 
+function renderUploadCategories() {
+  els.uploadCategory.innerHTML = categories
+    .filter((category) => category !== "All")
+    .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+    .join("");
+}
+
 function renderVideos() {
-  els.resultCount.textContent = `${videos.length} video${videos.length === 1 ? "" : "s"}`;
-  els.videoGrid.innerHTML = videos.length
-    ? videos
-        .map(
-          (video) => `
-            <button class="video-card" type="button" data-video-id="${escapeHtml(video.id)}">
-              <span class="thumb">
-                <img src="${escapeHtml(video.thumbnail)}" alt="${escapeHtml(video.title)}" loading="lazy" />
-                <span class="duration">${escapeHtml(video.duration)}</span>
-              </span>
-              <footer>
-                <span class="channel-avatar" style="--avatar-bg: ${escapeHtml(video.avatar)}">${escapeHtml(initials(video.channel))}</span>
-                <div class="video-info">
-                  <h3 class="video-title">${escapeHtml(video.title)}</h3>
-                  <p class="video-channel">${escapeHtml(video.channel)}</p>
-                  <p class="meta-line"><span>${escapeHtml(video.views)}</span><span>-</span><span>${escapeHtml(video.age)}</span></p>
-                </div>
-              </footer>
-            </button>
-          `
-        )
-        .join("")
-    : `<p class="empty-state">No videos found. Try a broader search.</p>`;
+  computeVisibleVideos();
+  els.feedTitle.textContent = titleForMode();
+  els.resultCount.textContent = `${visibleVideos.length} video${visibleVideos.length === 1 ? "" : "s"}`;
+  els.videoGrid.innerHTML = visibleVideos.length
+    ? visibleVideos.map(videoCardTemplate).join("")
+    : `<p class="empty-state">No videos found. Try another search or category.</p>`;
+}
+
+function videoCardTemplate(video) {
+  return `
+    <button class="video-card" type="button" data-video-id="${escapeHtml(video.id)}">
+      <span class="thumb">
+        <img src="${escapeHtml(video.thumbnail)}" alt="${escapeHtml(video.title)}" loading="lazy" />
+        <span class="duration">${escapeHtml(video.duration)}</span>
+      </span>
+      <footer>
+        <span class="channel-avatar" style="--avatar-bg: ${escapeHtml(video.avatar)}">${escapeHtml(initials(video.channel))}</span>
+        <span class="video-info">
+          <h3 class="video-title">${escapeHtml(video.title)}</h3>
+          <p class="video-channel">${escapeHtml(video.channel)}</p>
+          <p class="meta-line"><span>${escapeHtml(video.views)}</span><span>-</span><span>${escapeHtml(video.age)}</span></p>
+        </span>
+      </footer>
+    </button>
+  `;
 }
 
 function renderShorts() {
@@ -253,7 +317,7 @@ function renderShorts() {
 }
 
 function renderRecommendations() {
-  const items = videos.filter((video) => video.id !== activeVideo?.id).slice(0, 8);
+  const items = allVideos.filter((video) => video.id !== activeVideo?.id).slice(0, 10);
   els.watchRecommendations.innerHTML = items
     .map(
       (video) => `
@@ -290,6 +354,57 @@ function renderComments(video) {
     : `<p class="empty-comments">No comments yet.</p>`;
 }
 
+function renderWatchActions() {
+  if (!activeVideo) return;
+  els.likeButton.classList.toggle("selected", likedIds.has(activeVideo.id));
+  els.saveButton.classList.toggle("selected", savedIds.has(activeVideo.id));
+  els.saveButton.lastChild.textContent = savedIds.has(activeVideo.id) ? "Saved" : "Save";
+  els.subscribeButton.textContent = subscribedChannels.has(activeVideo.channel) ? "Subscribed" : "Subscribe";
+  els.subscribeButton.classList.toggle("subscribed", subscribedChannels.has(activeVideo.channel));
+}
+
+function renderAll() {
+  renderFeatured();
+  renderChips();
+  renderUploadCategories();
+  renderVideos();
+  renderShorts();
+  if (activeVideo) renderRecommendations();
+}
+
+function stopPlayer() {
+  const host = document.querySelector("#youtubePlayer");
+  if (host) host.innerHTML = "";
+}
+
+function loadPlayer(youtubeId) {
+  const host = document.querySelector("#youtubePlayer");
+  host.innerHTML = `
+    <iframe
+      src="https://www.youtube.com/embed/${encodeURIComponent(youtubeId)}?autoplay=1&controls=1&rel=0&modestbranding=1"
+      title="YouTube video player"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen>
+    </iframe>
+  `;
+}
+
+function showHome() {
+  els.homeView.hidden = false;
+  els.watchView.hidden = true;
+  document.body.classList.remove("watching");
+  document.title = "Virello";
+  history.replaceState(null, "", location.pathname);
+  stopPlayer();
+}
+
+function showWatch() {
+  els.homeView.hidden = true;
+  els.watchView.hidden = false;
+  document.body.classList.add("watching");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function hydrateWatch(video) {
   activeVideo = presentVideo(video);
   document.title = `${activeVideo.title} - Virello`;
@@ -303,28 +418,31 @@ function hydrateWatch(video) {
   els.likeCount.textContent = compactNumber(activeVideo.likes);
   renderComments(activeVideo);
   renderRecommendations();
+  renderWatchActions();
   showWatch();
   loadPlayer(activeVideo.youtubeId);
 }
 
 async function openVideo(id, options = {}) {
-  const localVideo = videos.find((video) => video.id === id) || featured;
-  if (!localVideo) return;
+  let video = allVideos.find((item) => item.id === id) || featured;
+  if (!video) return;
 
-  let video = localVideo;
   try {
     video = await api.getVideo(id);
   } catch {
-    video = localVideo;
+    // GitHub Pages fallback uses the already loaded static data.
   }
 
   hydrateWatch(video);
+  saveHistory(id);
   history.replaceState(null, "", `#watch=${encodeURIComponent(id)}`);
 
   if (!options.skipView) {
     try {
       const updated = await api.countView(id);
-      Object.assign(activeVideo, presentVideo(updated));
+      const presented = presentVideo(updated);
+      Object.assign(activeVideo, presented);
+      allVideos = allVideos.map((item) => (item.id === id ? presented : item));
       els.watchViews.textContent = `${activeVideo.views} - ${activeVideo.age}`;
     } catch {
       activeVideo.viewCount = (activeVideo.viewCount || 0) + 1;
@@ -334,44 +452,128 @@ async function openVideo(id, options = {}) {
   }
 }
 
-async function refreshData() {
+async function loadData() {
+  let data = fallbackState;
   try {
-    const data = await api.getBootstrap(activeCategory, activeQuery);
-    categories = data.categories;
-    featured = data.featured;
-    videos = data.videos.map(presentVideo);
-    shorts = data.shorts.map(presentShort);
+    data = await api.bootstrap();
   } catch {
     const response = await fetch("data/db.json");
-    const data = response.ok ? await response.json() : fallbackState;
-    categories = data.categories;
-    featured = data.featured;
-    videos = filterFallbackVideos(data.videos || []).map(presentVideo);
-    shorts = (data.shorts || []).map(presentShort);
+    data = response.ok ? await response.json() : fallbackState;
   }
 
-  renderFeatured();
-  renderChips();
-  renderVideos();
-  renderShorts();
+  categories = data.categories || fallbackState.categories;
+  featured = data.featured;
+  allVideos = (data.videos || []).map(presentVideo);
+  shorts = (data.shorts || []).map(presentShort);
+  renderAll();
 
   const watchId = location.hash.startsWith("#watch=") ? decodeURIComponent(location.hash.replace("#watch=", "")) : "";
-  if (watchId && !activeVideo) openVideo(watchId, { skipView: true });
+  if (watchId) openVideo(watchId, { skipView: true });
+}
+
+function runSearch() {
+  activeQuery = els.searchInput.value.trim();
+  activeMode = "home";
+  activeCategory = "All";
+  setActiveNav("home");
+  showHome();
+  renderAll();
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 180);
+}
+
+function openUploadModal() {
+  els.uploadModal.classList.add("open");
+  els.uploadModal.setAttribute("aria-hidden", "false");
+  els.uploadYoutube.focus();
+}
+
+function closeUploadModal() {
+  els.uploadModal.classList.remove("open");
+  els.uploadModal.setAttribute("aria-hidden", "true");
+  els.uploadForm.reset();
+}
+
+function localCreateVideo(payload) {
+  const youtubeId = extractYouTubeId(payload.youtubeUrl || payload.youtubeId);
+  const baseId = slugify(payload.title);
+  let id = baseId;
+  let suffix = 2;
+  while (allVideos.some((video) => video.id === id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  return presentVideo({
+    id,
+    youtubeId,
+    title: payload.title,
+    channel: payload.channel,
+    description: payload.description || "Added through Virello Create.",
+    viewCount: 0,
+    age: "Just now",
+    duration: "YouTube",
+    category: payload.category || "Recently uploaded",
+    avatar: "#2563eb",
+    likes: 0,
+    subscribers: "New channel",
+    comments: [],
+  });
 }
 
 els.homeLink.addEventListener("click", (event) => {
   event.preventDefault();
-  document.title = "Virello";
-  activeVideo = null;
+  activeMode = "home";
+  activeCategory = "All";
+  activeQuery = "";
+  els.searchInput.value = "";
+  setActiveNav("home");
   showHome();
+  renderAll();
 });
 
-els.chips.addEventListener("click", async (event) => {
+els.navItems.forEach((item) => {
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    const nav = item.dataset.nav;
+    setActiveNav(nav);
+
+    if (nav === "shorts") {
+      activeMode = "home";
+      showHome();
+      renderAll();
+      document.querySelector("#shorts").scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    activeMode = nav === "home" ? "home" : nav;
+    activeCategory = "All";
+    activeQuery = "";
+    els.searchInput.value = "";
+    showHome();
+    renderAll();
+  });
+});
+
+els.chips.addEventListener("click", (event) => {
   const chip = event.target.closest(".chip");
   if (!chip) return;
+  activeMode = "home";
   activeCategory = chip.dataset.category;
-  await refreshData();
+  activeQuery = "";
+  els.searchInput.value = "";
+  setActiveNav("home");
+  renderAll();
 });
+
+els.searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  runSearch();
+});
+
+els.searchInput.addEventListener("input", debounceSearch);
 
 els.videoGrid.addEventListener("click", (event) => {
   const card = event.target.closest(".video-card");
@@ -387,35 +589,57 @@ els.shortsRow.addEventListener("click", (event) => {
   const card = event.target.closest(".short-card");
   if (!card) return;
   const short = shorts.find((item) => item.id === card.dataset.shortId);
-  const video = videos.find((item) => item.youtubeId === short?.youtubeId) || featured;
+  const video = allVideos.find((item) => item.youtubeId === short?.youtubeId) || featured;
   if (video) openVideo(video.id);
 });
 
 els.watchFeatured.addEventListener("click", () => featured && openVideo(featured.id));
 els.watchFeaturedAction.addEventListener("click", () => featured && openVideo(featured.id));
 
-els.searchForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  activeQuery = els.searchInput.value;
-  await refreshData();
-  showHome();
-});
-
-els.searchInput.addEventListener("input", async () => {
-  activeQuery = els.searchInput.value;
-  await refreshData();
-});
-
 els.likeButton.addEventListener("click", async () => {
   if (!activeVideo) return;
-  try {
-    const updated = await api.likeVideo(activeVideo.id);
-    activeVideo.likes = updated.likes;
-  } catch {
-    activeVideo.likes = (activeVideo.likes || 0) + 1;
-    localStorage.setItem(`virello-likes-${activeVideo.id}`, String(activeVideo.likes));
+  const alreadyLiked = likedIds.has(activeVideo.id);
+  if (alreadyLiked) {
+    likedIds.delete(activeVideo.id);
+    activeVideo.likes = Math.max(0, Number(activeVideo.likes || 0) - 1);
+  } else {
+    likedIds.add(activeVideo.id);
+    try {
+      const updated = await api.likeVideo(activeVideo.id);
+      activeVideo.likes = updated.likes;
+    } catch {
+      activeVideo.likes = Number(activeVideo.likes || 0) + 1;
+    }
   }
+  writeSet("virello:liked", likedIds);
   els.likeCount.textContent = compactNumber(activeVideo.likes);
+  renderWatchActions();
+});
+
+els.saveButton.addEventListener("click", () => {
+  if (!activeVideo) return;
+  if (savedIds.has(activeVideo.id)) {
+    savedIds.delete(activeVideo.id);
+    showToast("Removed from Library");
+  } else {
+    savedIds.add(activeVideo.id);
+    showToast("Saved to Library");
+  }
+  writeSet("virello:saved", savedIds);
+  renderWatchActions();
+});
+
+els.subscribeButton.addEventListener("click", () => {
+  if (!activeVideo) return;
+  if (subscribedChannels.has(activeVideo.channel)) {
+    subscribedChannels.delete(activeVideo.channel);
+    showToast(`Unsubscribed from ${activeVideo.channel}`);
+  } else {
+    subscribedChannels.add(activeVideo.channel);
+    showToast(`Subscribed to ${activeVideo.channel}`);
+  }
+  writeSet("virello:subscribed", subscribedChannels);
+  renderWatchActions();
 });
 
 els.commentForm.addEventListener("submit", async (event) => {
@@ -431,30 +655,29 @@ els.commentForm.addEventListener("submit", async (event) => {
     const comment = await api.addComment(activeVideo.id, payload);
     activeVideo.comments = [comment, ...(activeVideo.comments || [])];
   } catch {
-    const comment = {
-      id: `local-${Date.now()}`,
-      name: payload.name || "Guest",
-      text: payload.text,
-      createdAt: new Date().toISOString(),
-    };
-    activeVideo.comments = [comment, ...(activeVideo.comments || [])];
-    localStorage.setItem(`virello-comments-${activeVideo.id}`, JSON.stringify(activeVideo.comments));
+    activeVideo.comments = [
+      {
+        id: `local-${Date.now()}`,
+        name: payload.name || "Guest",
+        text: payload.text,
+        createdAt: new Date().toISOString(),
+      },
+      ...(activeVideo.comments || []),
+    ];
   }
 
   els.commentText.value = "";
   renderComments(activeVideo);
+  showToast("Comment posted");
 });
 
 els.shareButton.addEventListener("click", async () => {
   const url = `${location.origin}${location.pathname}#watch=${encodeURIComponent(activeVideo?.id || "")}`;
   try {
     await navigator.clipboard.writeText(url);
-    els.shareButton.lastChild.textContent = "Copied";
-    setTimeout(() => {
-      els.shareButton.lastChild.textContent = "Share";
-    }, 1200);
+    showToast("Link copied");
   } catch {
-    prompt("Copy link", url);
+    window.prompt("Copy link", url);
   }
 });
 
@@ -462,13 +685,49 @@ els.copyLinkButton.addEventListener("click", async () => {
   const url = `${location.origin}${location.pathname}`;
   try {
     await navigator.clipboard.writeText(url);
-    els.copyLinkButton.textContent = "Copied";
-    setTimeout(() => {
-      els.copyLinkButton.textContent = "Copy link";
-    }, 1200);
+    showToast("Link copied");
   } catch {
-    prompt("Copy link", url);
+    window.prompt("Copy link", url);
   }
+});
+
+els.createButton.addEventListener("click", openUploadModal);
+els.closeUpload.addEventListener("click", closeUploadModal);
+els.uploadModal.addEventListener("click", (event) => {
+  if (event.target === els.uploadModal) closeUploadModal();
+});
+
+els.uploadForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const youtubeId = extractYouTubeId(els.uploadYoutube.value);
+  if (!youtubeId) {
+    showToast("Enter a valid YouTube URL or 11-character video ID");
+    return;
+  }
+
+  const payload = {
+    youtubeUrl: els.uploadYoutube.value,
+    youtubeId,
+    title: els.uploadTitle.value.trim(),
+    channel: els.uploadChannel.value.trim(),
+    category: els.uploadCategory.value,
+    description: els.uploadDescription.value.trim(),
+  };
+
+  let created;
+  try {
+    created = await api.createVideo(payload);
+    showToast("Video added");
+  } catch {
+    created = localCreateVideo(payload);
+    showToast("Video added locally");
+  }
+
+  const presented = presentVideo(created);
+  allVideos = [presented, ...allVideos.filter((video) => video.id !== presented.id)];
+  closeUploadModal();
+  renderAll();
+  openVideo(presented.id, { skipView: true });
 });
 
 document.querySelector("#menuButton").addEventListener("click", () => {
@@ -476,4 +735,10 @@ document.querySelector("#menuButton").addEventListener("click", () => {
   els.shell.classList.toggle("nav-collapsed");
 });
 
-refreshData();
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && els.uploadModal.classList.contains("open")) {
+    closeUploadModal();
+  }
+});
+
+loadData();

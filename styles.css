@@ -31,7 +31,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -671,6 +673,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .watch-channel strong {
@@ -688,6 +691,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .description-box {
@@ -785,8 +789,28 @@ svg {
   color: var(--text);
 }
 
-.pill-button:hover {
+.pill-button:hover,
+.pill-button.selected {
   background: #e1e1e1;
+}
+
+.pill-button.selected {
+  color: var(--brand);
+}
+
+.subscribe-button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.subscribe-button.subscribed {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .player-stat {
@@ -856,6 +880,101 @@ svg {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal.open {
+  display: grid;
+}
+
+.modal-card {
+  width: min(560px, 100%);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.upload-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.upload-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.upload-form input,
+.upload-form select,
+.upload-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.upload-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.upload-form input:focus,
+.upload-form select:focus,
+.upload-form textarea:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 80;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(15, 15, 15, 0.94);
+  color: #ffffff;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 12px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 @media (max-width: 980px) {

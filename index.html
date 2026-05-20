@@ -91,7 +91,7 @@
           </section>
 
           <div class="section-heading">
-            <h2>Recommended</h2>
+            <h2 id="feedTitle">Recommended</h2>
             <span id="resultCount"></span>
           </div>
           <section class="video-grid" id="videoGrid" aria-label="Recommended videos"></section>
@@ -116,6 +116,7 @@
                     <strong id="watchChannel"></strong>
                     <p id="watchSubscribers"></p>
                   </div>
+                  <button class="subscribe-button" id="subscribeButton" type="button">Subscribe</button>
                 </div>
                 <div class="watch-actions">
                   <button class="pill-button" id="likeButton" type="button">
@@ -125,6 +126,10 @@
                   <button class="pill-button" id="shareButton" type="button">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="M12 3v13M7 8l5-5 5 5" /></svg>
                     Share
+                  </button>
+                  <button class="pill-button" id="saveButton" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-3-6 3V4Z" /></svg>
+                    Save
                   </button>
                 </div>
               </div>
@@ -147,6 +152,42 @@
         </section>
       </main>
     </div>
+
+    <div class="modal" id="uploadModal" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
+        <div class="modal-header">
+          <h2 id="uploadTitle">Create video</h2>
+          <button class="icon-button" id="closeUpload" type="button" aria-label="Close create video">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <form class="upload-form" id="uploadForm">
+          <label>
+            <span>YouTube URL or ID</span>
+            <input id="uploadYoutube" type="text" placeholder="https://www.youtube.com/watch?v=..." required />
+          </label>
+          <label>
+            <span>Title</span>
+            <input id="uploadTitleInput" type="text" placeholder="Video title" maxlength="100" required />
+          </label>
+          <label>
+            <span>Channel</span>
+            <input id="uploadChannel" type="text" placeholder="Channel name" maxlength="50" required />
+          </label>
+          <label>
+            <span>Category</span>
+            <select id="uploadCategory"></select>
+          </label>
+          <label>
+            <span>Description</span>
+            <textarea id="uploadDescription" placeholder="What is this video about?" maxlength="300"></textarea>
+          </label>
+          <button class="primary-dark-button" type="submit">Add video</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="app.js"></script>
