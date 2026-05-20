@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 const port = Number(process.env.PORT || 3000);
 const root = process.cwd();
@@ -16,7 +17,10 @@ const types = {
 
 async function readDb() {
   const raw = await readFile(dbPath, "utf-8");
-  return JSON.parse(raw);
+  const db = JSON.parse(raw);
+  db.users ||= [];
+  db.sessions ||= [];
+  return db;
 }
 
 async function writeDb(db) {
@@ -48,6 +52,42 @@ function compactNumber(value) {
 
 function thumbnailUrl(youtubeId, quality = "hqdefault") {
   return `https://img.youtube.com/vi/${youtubeId}/${quality}.jpg`;
+}
+
+function hashPassword(password, salt) {
+  return createHash("sha256").update(`${salt}:${password}`).digest("hex");
+}
+
+function safeUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+  };
+}
+
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  return header.startsWith("Bearer ") ? header.slice(7) : "";
+}
+
+function getUserFromRequest(db, req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  const session = db.sessions.find((item) => item.token === token);
+  if (!session) return null;
+  return db.users.find((user) => user.id === session.userId) || null;
+}
+
+function requireUser(db, req, res) {
+  const user = getUserFromRequest(db, req);
+  if (!user) {
+    json(res, 401, { error: "Login required" });
+    return null;
+  }
+  return user;
 }
 
 function presentVideo(video) {
@@ -121,6 +161,59 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true, app: "Virello" });
   }
 
+  if (req.method === "GET" && path === "/api/auth/me") {
+    return json(res, 200, { user: safeUser(getUserFromRequest(db, req)) });
+  }
+
+  if (req.method === "POST" && path === "/api/auth/signup") {
+    const body = await readBody(req);
+    const name = String(body.name || "").trim().slice(0, 40);
+    const email = String(body.email || "").trim().toLowerCase();
+    const password = String(body.password || "");
+    if (!name || !email || password.length < 4) {
+      return json(res, 400, { error: "Name, email, and a 4+ character password are required" });
+    }
+    if (db.users.some((user) => user.email === email)) {
+      return json(res, 409, { error: "Account already exists" });
+    }
+    const salt = randomBytes(12).toString("hex");
+    const user = {
+      id: randomUUID(),
+      name,
+      email,
+      avatar: name.slice(0, 1).toUpperCase(),
+      salt,
+      passwordHash: hashPassword(password, salt),
+      createdAt: new Date().toISOString(),
+    };
+    const token = randomBytes(32).toString("hex");
+    db.users.push(user);
+    db.sessions.push({ token, userId: user.id, createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(res, 201, { user: safeUser(user), token });
+  }
+
+  if (req.method === "POST" && path === "/api/auth/login") {
+    const body = await readBody(req);
+    const email = String(body.email || "").trim().toLowerCase();
+    const password = String(body.password || "");
+    const user = db.users.find((item) => item.email === email);
+    if (!user || user.passwordHash !== hashPassword(password, user.salt)) {
+      return json(res, 401, { error: "Invalid email or password" });
+    }
+    const token = randomBytes(32).toString("hex");
+    db.sessions.push({ token, userId: user.id, createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(res, 200, { user: safeUser(user), token });
+  }
+
+  if (req.method === "POST" && path === "/api/auth/logout") {
+    const token = getBearerToken(req);
+    db.sessions = db.sessions.filter((session) => session.token !== token);
+    await writeDb(db);
+    return json(res, 200, { ok: true });
+  }
+
   if (req.method === "GET" && path === "/api/bootstrap") {
     return json(res, 200, {
       categories: db.categories,
@@ -139,6 +232,8 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && path === "/api/videos") {
+    const user = requireUser(db, req, res);
+    if (!user) return;
     const body = await readBody(req);
     const youtubeId = getYouTubeId(body.youtubeId || body.youtubeUrl);
     const title = String(body.title || "").trim();
@@ -168,6 +263,7 @@ async function handleApi(req, res, url) {
       avatar: "#2563eb",
       likes: 0,
       subscribers: "New channel",
+      ownerId: user.id,
       comments: [],
     };
     db.videos.unshift(video);
@@ -207,15 +303,17 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && action === "comments") {
+    const user = requireUser(db, req, res);
+    if (!user) return;
     const body = await readBody(req);
     const text = String(body.text || "").trim();
-    const name = String(body.name || "Guest").trim().slice(0, 32) || "Guest";
     if (!text) return json(res, 400, { error: "Comment text is required" });
 
     const comment = {
       id: `c-${Date.now()}`,
-      name,
+      name: user.name,
       text: text.slice(0, 280),
+      userId: user.id,
       createdAt: new Date().toISOString(),
     };
     video.comments.unshift(comment);

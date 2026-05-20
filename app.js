@@ -1,4 +1,11 @@
 const api = {
+  token() {
+    return localStorage.getItem("virello:token") || "";
+  },
+  authHeaders() {
+    const token = api.token();
+    return token ? { authorization: `Bearer ${token}` } : {};
+  },
   async bootstrap() {
     const response = await fetch("/api/bootstrap");
     if (!response.ok) throw new Error("API unavailable");
@@ -22,7 +29,7 @@ const api = {
   async addComment(id, comment) {
     const response = await fetch(`/api/videos/${id}/comments`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...api.authHeaders() },
       body: JSON.stringify(comment),
     });
     if (!response.ok) throw new Error("Comment failed");
@@ -31,10 +38,41 @@ const api = {
   async createVideo(video) {
     const response = await fetch("/api/videos", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...api.authHeaders() },
       body: JSON.stringify(video),
     });
     if (!response.ok) throw new Error("Create video failed");
+    return response.json();
+  },
+  async me() {
+    const response = await fetch("/api/auth/me", { headers: api.authHeaders() });
+    if (!response.ok) throw new Error("Session unavailable");
+    return response.json();
+  },
+  async login(credentials) {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(credentials),
+    });
+    if (!response.ok) throw new Error("Login failed");
+    return response.json();
+  },
+  async signup(credentials) {
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(credentials),
+    });
+    if (!response.ok) throw new Error("Signup failed");
+    return response.json();
+  },
+  async logout() {
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: api.authHeaders(),
+    });
+    if (!response.ok) throw new Error("Logout failed");
     return response.json();
   },
 };
@@ -47,6 +85,12 @@ const els = {
   homeLink: document.querySelector("#homeLink"),
   navItems: document.querySelectorAll(".nav-item"),
   createButton: document.querySelector("#createButton"),
+  accountButton: document.querySelector("#accountButton"),
+  accountMenu: document.querySelector("#accountMenu"),
+  accountName: document.querySelector("#accountName"),
+  accountEmail: document.querySelector("#accountEmail"),
+  loginOpenButton: document.querySelector("#loginOpenButton"),
+  logoutButton: document.querySelector("#logoutButton"),
   chips: document.querySelector("#chips"),
   videoGrid: document.querySelector("#videoGrid"),
   shortsRow: document.querySelector("#shortsRow"),
@@ -73,7 +117,6 @@ const els = {
   saveButton: document.querySelector("#saveButton"),
   commentCount: document.querySelector("#commentCount"),
   commentForm: document.querySelector("#commentForm"),
-  commentName: document.querySelector("#commentName"),
   commentText: document.querySelector("#commentText"),
   commentsList: document.querySelector("#commentsList"),
   watchRecommendations: document.querySelector("#watchRecommendations"),
@@ -85,6 +128,17 @@ const els = {
   uploadChannel: document.querySelector("#uploadChannel"),
   uploadCategory: document.querySelector("#uploadCategory"),
   uploadDescription: document.querySelector("#uploadDescription"),
+  authModal: document.querySelector("#authModal"),
+  closeAuth: document.querySelector("#closeAuth"),
+  authForm: document.querySelector("#authForm"),
+  authTitle: document.querySelector("#authTitle"),
+  authNameLabel: document.querySelector("#authNameLabel"),
+  authName: document.querySelector("#authName"),
+  authEmail: document.querySelector("#authEmail"),
+  authPassword: document.querySelector("#authPassword"),
+  authSubmit: document.querySelector("#authSubmit"),
+  loginTab: document.querySelector("#loginTab"),
+  signupTab: document.querySelector("#signupTab"),
   toast: document.querySelector("#toast"),
 };
 
@@ -104,6 +158,8 @@ let activeCategory = "All";
 let activeQuery = "";
 let activeMode = "home";
 let activeVideo = null;
+let currentUser = null;
+let authMode = "login";
 let searchTimer = null;
 let toastTimer = null;
 
@@ -127,6 +183,40 @@ const savedIds = readSet("virello:saved");
 const likedIds = readSet("virello:liked");
 const subscribedChannels = readSet("virello:subscribed");
 let historyIds = [...readSet("virello:history")];
+
+function readLocalUser() {
+  try {
+    return JSON.parse(localStorage.getItem("virello:user") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function readLocalAccounts() {
+  try {
+    return JSON.parse(localStorage.getItem("virello:accounts") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalAccounts(accounts) {
+  localStorage.setItem("virello:accounts", JSON.stringify(accounts));
+}
+
+function saveAuthSession(user, token = "") {
+  currentUser = user;
+  if (token) localStorage.setItem("virello:token", token);
+  localStorage.setItem("virello:user", JSON.stringify(user));
+  renderAccount();
+}
+
+function clearAuthSession() {
+  currentUser = null;
+  localStorage.removeItem("virello:token");
+  localStorage.removeItem("virello:user");
+  renderAccount();
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -206,6 +296,48 @@ function showToast(message) {
   els.toast.textContent = message;
   els.toast.classList.add("show");
   toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1800);
+}
+
+function renderAccount() {
+  const name = currentUser?.name || "Guest";
+  els.accountButton.textContent = initials(name);
+  els.accountName.textContent = name;
+  els.accountEmail.textContent = currentUser?.email || "Not signed in";
+  els.loginOpenButton.hidden = Boolean(currentUser);
+  els.logoutButton.hidden = !currentUser;
+  if (currentUser) {
+    els.commentText.placeholder = `Comment as ${currentUser.name}`;
+  } else {
+    els.commentText.placeholder = "Sign in to add a comment";
+  }
+}
+
+function requireLogin(action = "continue") {
+  if (currentUser) return true;
+  showToast(`Sign in to ${action}`);
+  openAuthModal("login");
+  return false;
+}
+
+function openAuthModal(mode = "login") {
+  authMode = mode;
+  const signingUp = authMode === "signup";
+  els.authTitle.textContent = signingUp ? "Create your Virello account" : "Sign in to Virello";
+  els.authSubmit.textContent = signingUp ? "Create account" : "Login";
+  els.authNameLabel.hidden = !signingUp;
+  els.authName.required = signingUp;
+  els.loginTab.classList.toggle("active", !signingUp);
+  els.signupTab.classList.toggle("active", signingUp);
+  els.authModal.classList.add("open");
+  els.authModal.setAttribute("aria-hidden", "false");
+  els.accountMenu.hidden = true;
+  setTimeout(() => (signingUp ? els.authName : els.authEmail).focus(), 0);
+}
+
+function closeAuthModal() {
+  els.authModal.classList.remove("open");
+  els.authModal.setAttribute("aria-hidden", "true");
+  els.authForm.reset();
 }
 
 function setActiveNav(nav) {
@@ -486,6 +618,7 @@ function debounceSearch() {
 }
 
 function openUploadModal() {
+  if (!requireLogin("create a video")) return;
   els.uploadModal.classList.add("open");
   els.uploadModal.setAttribute("aria-hidden", "false");
   els.uploadYoutube.focus();
@@ -644,10 +777,10 @@ els.subscribeButton.addEventListener("click", () => {
 
 els.commentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!activeVideo) return;
+  if (!activeVideo || !requireLogin("comment")) return;
 
   const payload = {
-    name: els.commentName.value,
+    name: currentUser.name,
     text: els.commentText.value,
   };
 
@@ -658,8 +791,9 @@ els.commentForm.addEventListener("submit", async (event) => {
     activeVideo.comments = [
       {
         id: `local-${Date.now()}`,
-        name: payload.name || "Guest",
+        name: currentUser.name,
         text: payload.text,
+        userId: currentUser.id,
         createdAt: new Date().toISOString(),
       },
       ...(activeVideo.comments || []),
@@ -692,9 +826,71 @@ els.copyLinkButton.addEventListener("click", async () => {
 });
 
 els.createButton.addEventListener("click", openUploadModal);
+els.accountButton.addEventListener("click", () => {
+  els.accountMenu.hidden = !els.accountMenu.hidden;
+});
+els.loginOpenButton.addEventListener("click", () => openAuthModal("login"));
+els.logoutButton.addEventListener("click", async () => {
+  try {
+    await api.logout();
+  } catch {
+    // Static fallback can still clear the local session.
+  }
+  clearAuthSession();
+  els.accountMenu.hidden = true;
+  showToast("Signed out");
+});
 els.closeUpload.addEventListener("click", closeUploadModal);
 els.uploadModal.addEventListener("click", (event) => {
   if (event.target === els.uploadModal) closeUploadModal();
+});
+
+els.closeAuth.addEventListener("click", closeAuthModal);
+els.authModal.addEventListener("click", (event) => {
+  if (event.target === els.authModal) closeAuthModal();
+});
+els.loginTab.addEventListener("click", () => openAuthModal("login"));
+els.signupTab.addEventListener("click", () => openAuthModal("signup"));
+
+els.authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const credentials = {
+    name: els.authName.value.trim(),
+    email: els.authEmail.value.trim(),
+    password: els.authPassword.value,
+  };
+
+  try {
+    const session = authMode === "signup" ? await api.signup(credentials) : await api.login(credentials);
+    saveAuthSession(session.user, session.token);
+    closeAuthModal();
+    showToast(authMode === "signup" ? "Account created" : "Signed in");
+  } catch {
+    if (authMode === "signup") {
+      const localUser = {
+        id: `local-${Date.now()}`,
+        name: credentials.name || credentials.email.split("@")[0],
+        email: credentials.email,
+        avatar: (credentials.name || credentials.email).slice(0, 1).toUpperCase(),
+      };
+      const accounts = readLocalAccounts().filter((account) => account.email !== localUser.email);
+      accounts.push({ ...localUser, password: credentials.password });
+      writeLocalAccounts(accounts);
+      saveAuthSession(localUser, `local-${Date.now()}`);
+      closeAuthModal();
+      showToast("Account created locally");
+    } else {
+      const account = readLocalAccounts().find((item) => item.email === credentials.email && item.password === credentials.password);
+      if (account) {
+        const { password, ...localUser } = account;
+        saveAuthSession(localUser, `local-${Date.now()}`);
+        closeAuthModal();
+        showToast("Signed in locally");
+      } else {
+        showToast("Login failed. Try sign up first.");
+      }
+    }
+  }
 });
 
 els.uploadForm.addEventListener("submit", async (event) => {
@@ -739,6 +935,22 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && els.uploadModal.classList.contains("open")) {
     closeUploadModal();
   }
+  if (event.key === "Escape" && els.authModal.classList.contains("open")) {
+    closeAuthModal();
+  }
 });
 
+async function restoreSession() {
+  currentUser = readLocalUser();
+  renderAccount();
+  if (!api.token()) return;
+  try {
+    const session = await api.me();
+    if (session.user) saveAuthSession(session.user);
+  } catch {
+    // Keep static/local sessions available on GitHub Pages.
+  }
+}
+
+restoreSession();
 loadData();

@@ -11,6 +11,8 @@
     "Live",
     "Recently uploaded"
   ],
+  "users": [],
+  "sessions": [],
   "featured": {
     "id": "yt-api-demo",
     "youtubeId": "M7lc1UVf-VE",

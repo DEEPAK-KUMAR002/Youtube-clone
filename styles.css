@@ -192,6 +192,54 @@ svg {
   font-weight: 700;
 }
 
+.account {
+  position: relative;
+}
+
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  width: 220px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(15, 15, 15, 0.18);
+}
+
+.account-menu[hidden] {
+  display: none;
+}
+
+.account-menu strong {
+  font-size: 14px;
+}
+
+.account-menu span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.menu-button:hover {
+  background: #e1e1e1;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
@@ -831,7 +879,7 @@ svg {
 
 .comment-form {
   display: grid;
-  grid-template-columns: minmax(120px, 0.4fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) auto;
   gap: 10px;
 }
 
@@ -975,6 +1023,31 @@ svg {
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.auth-card {
+  max-width: 420px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.auth-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.auth-tab.active {
+  background: var(--text);
+  color: #ffffff;
 }
 
 @media (max-width: 980px) {

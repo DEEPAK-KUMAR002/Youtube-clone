@@ -35,7 +35,15 @@
         <button class="icon-button hide-small" aria-label="Notifications">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>
         </button>
-        <button class="avatar-button" aria-label="Account">D</button>
+        <div class="account">
+          <button class="avatar-button" id="accountButton" aria-label="Account">?</button>
+          <div class="account-menu" id="accountMenu" hidden>
+            <strong id="accountName">Guest</strong>
+            <span id="accountEmail">Not signed in</span>
+            <button class="menu-button" id="loginOpenButton" type="button">Sign in</button>
+            <button class="menu-button" id="logoutButton" type="button" hidden>Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -140,7 +148,6 @@
               <section class="comments-panel" aria-label="Comments">
                 <h2 id="commentCount">0 comments</h2>
                 <form class="comment-form" id="commentForm">
-                  <input id="commentName" type="text" placeholder="Your name" maxlength="32" />
                   <input id="commentText" type="text" placeholder="Add a comment" maxlength="280" required />
                   <button class="primary-dark-button" type="submit">Post</button>
                 </form>
@@ -183,6 +190,36 @@
             <textarea id="uploadDescription" placeholder="What is this video about?" maxlength="300"></textarea>
           </label>
           <button class="primary-dark-button" type="submit">Add video</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="authModal" aria-hidden="true">
+      <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="modal-header">
+          <h2 id="authTitle">Sign in to Virello</h2>
+          <button class="icon-button" id="closeAuth" type="button" aria-label="Close sign in">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div class="auth-tabs" role="tablist" aria-label="Account mode">
+          <button class="auth-tab active" id="loginTab" type="button">Login</button>
+          <button class="auth-tab" id="signupTab" type="button">Sign up</button>
+        </div>
+        <form class="upload-form" id="authForm">
+          <label id="authNameLabel" hidden>
+            <span>Name</span>
+            <input id="authName" type="text" placeholder="Your name" maxlength="40" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input id="authEmail" type="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="authPassword" type="password" placeholder="At least 4 characters" minlength="4" required />
+          </label>
+          <button class="primary-dark-button" id="authSubmit" type="submit">Login</button>
         </form>
       </div>
     </div>

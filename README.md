@@ -24,6 +24,10 @@ The app uses the official YouTube iframe player API for real playback.
 The local server provides these JSON endpoints:
 
 - `GET /api/health`
+- `GET /api/auth/me`
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `GET /api/bootstrap`
 - `GET /api/videos?category=Learning&query=javascript`
 - `GET /api/shorts`
@@ -46,6 +50,7 @@ Video, like, view, and comment data is stored in `data/db.json`.
 - Recommendation sidebar
 - Working Library, History, and Subscriptions views
 - Create flow for adding videos by YouTube URL or ID
+- Login, signup, logout, and account menu
 - Save, like, subscribe, share, and comment actions
 - Backend-powered views, likes, and comments
 - Collapsible side navigation
