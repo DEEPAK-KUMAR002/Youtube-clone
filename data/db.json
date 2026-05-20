@@ -1,0 +1,232 @@
+{
+  "categories": [
+    "All",
+    "Design",
+    "Music",
+    "Gaming",
+    "Podcasts",
+    "Live",
+    "JavaScript",
+    "Cooking",
+    "Travel",
+    "News",
+    "Recently uploaded"
+  ],
+  "featured": {
+    "id": "featured-dashboard",
+    "title": "Build Room: Designing a Creator Dashboard",
+    "channel": "Creator Lab Live",
+    "viewsLabel": "128K watching",
+    "thumb": "linear-gradient(155deg, #304f9c 0%, #845ec2 42%, #ff6f59 100%)"
+  },
+  "videos": [
+    {
+      "id": "studio-desk",
+      "title": "I rebuilt my entire studio around one tiny desk",
+      "channel": "Creator Lab",
+      "viewCount": 1800001,
+      "age": "2 days ago",
+      "duration": "12:48",
+      "category": "Design",
+      "thumb": "linear-gradient(135deg, #203a43, #2c5364 45%, #f9d423)",
+      "avatar": "#0ea5e9",
+      "likes": 42100,
+      "comments": [
+        {
+          "id": "c-studio-1",
+          "name": "Maya",
+          "text": "This setup is so clean. The cable management idea is brilliant.",
+          "createdAt": "2026-05-18T10:30:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "automation-week",
+      "title": "No-code automations that quietly save ten hours a week",
+      "channel": "Ops Theory",
+      "viewCount": 418000,
+      "age": "5 days ago",
+      "duration": "18:05",
+      "category": "JavaScript",
+      "thumb": "linear-gradient(135deg, #101820, #f2aa4c 58%, #ffffff)",
+      "avatar": "#f97316",
+      "likes": 17600,
+      "comments": []
+    },
+    {
+      "id": "lofi-edits",
+      "title": "Lo-fi beats for late night edits and clean focus",
+      "channel": "Room Tone",
+      "viewCount": 6200000,
+      "age": "1 month ago",
+      "duration": "1:02:12",
+      "category": "Music",
+      "thumb": "linear-gradient(135deg, #14213d, #fca311 52%, #e5e5e5)",
+      "avatar": "#8b5cf6",
+      "likes": 205000,
+      "comments": []
+    },
+    {
+      "id": "survival-city",
+      "title": "Building a tiny city in survival mode",
+      "channel": "Block & Build",
+      "viewCount": 923000,
+      "age": "3 weeks ago",
+      "duration": "24:39",
+      "category": "Gaming",
+      "thumb": "linear-gradient(135deg, #2d6a4f, #95d5b2 55%, #ffd166)",
+      "avatar": "#22c55e",
+      "likes": 38800,
+      "comments": []
+    },
+    {
+      "id": "coffee-roastery",
+      "title": "What actually happens inside a coffee roastery",
+      "channel": "Field Notes",
+      "viewCount": 311000,
+      "age": "4 days ago",
+      "duration": "9:31",
+      "category": "Cooking",
+      "thumb": "linear-gradient(135deg, #1b1b1b, #6f4e37 50%, #e0b084)",
+      "avatar": "#7c2d12",
+      "likes": 9800,
+      "comments": []
+    },
+    {
+      "id": "react-state",
+      "title": "React state patterns explained with real interface problems",
+      "channel": "Frontend Desk",
+      "viewCount": 782000,
+      "age": "8 days ago",
+      "duration": "16:22",
+      "category": "JavaScript",
+      "thumb": "linear-gradient(135deg, #023047, #219ebc 55%, #ffb703)",
+      "avatar": "#0284c7",
+      "likes": 33400,
+      "comments": [
+        {
+          "id": "c-react-1",
+          "name": "Aarav",
+          "text": "The before and after examples helped a lot.",
+          "createdAt": "2026-05-19T06:20:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "kyoto-walk",
+      "title": "A calm walking tour through Kyoto at sunrise",
+      "channel": "Slow Miles",
+      "viewCount": 2100000,
+      "age": "2 weeks ago",
+      "duration": "34:10",
+      "category": "Travel",
+      "thumb": "linear-gradient(135deg, #355070, #eaac8b 50%, #f8edeb)",
+      "avatar": "#db2777",
+      "likes": 81200,
+      "comments": []
+    },
+    {
+      "id": "ai-work",
+      "title": "The practical future of AI assistants at work",
+      "channel": "Signal Daily",
+      "viewCount": 654000,
+      "age": "13 hours ago",
+      "duration": "21:17",
+      "category": "News",
+      "thumb": "linear-gradient(135deg, #111827, #4f46e5 48%, #06b6d4)",
+      "avatar": "#111827",
+      "likes": 27600,
+      "comments": []
+    },
+    {
+      "id": "synthwave-live",
+      "title": "Live jam: synthwave set with modular hardware",
+      "channel": "Patch Bay",
+      "viewCount": 128000,
+      "age": "Live",
+      "duration": "LIVE",
+      "category": "Live",
+      "thumb": "linear-gradient(135deg, #240046, #ff006e 52%, #ffbe0b)",
+      "avatar": "#e11d48",
+      "likes": 14800,
+      "comments": []
+    },
+    {
+      "id": "dashboards-fast",
+      "title": "Why modern dashboards still feel slow and how to fix them",
+      "channel": "Product Systems",
+      "viewCount": 234000,
+      "age": "6 days ago",
+      "duration": "14:04",
+      "category": "Design",
+      "thumb": "linear-gradient(135deg, #3a0ca3, #4cc9f0 54%, #f72585)",
+      "avatar": "#7c3aed",
+      "likes": 10100,
+      "comments": []
+    },
+    {
+      "id": "prep-list",
+      "title": "The restaurant prep list that changed my weeknight dinners",
+      "channel": "Sharp Knife",
+      "viewCount": 1100000,
+      "age": "1 week ago",
+      "duration": "11:28",
+      "category": "Cooking",
+      "thumb": "linear-gradient(135deg, #283618, #dda15e 52%, #fefae0)",
+      "avatar": "#65a30d",
+      "likes": 49100,
+      "comments": []
+    },
+    {
+      "id": "shipping-podcast",
+      "title": "Deep dive podcast: shipping software without drama",
+      "channel": "Release Notes",
+      "viewCount": 94000,
+      "age": "Yesterday",
+      "duration": "58:43",
+      "category": "Podcasts",
+      "thumb": "linear-gradient(135deg, #001219, #0a9396 52%, #ee9b00)",
+      "avatar": "#0f766e",
+      "likes": 5200,
+      "comments": []
+    }
+  ],
+  "shorts": [
+    {
+      "id": "palette-trick",
+      "title": "Fastest color palette trick",
+      "viewCount": 3400000,
+      "thumb": "linear-gradient(145deg, #ff595e, #ffca3a, #8ac926)"
+    },
+    {
+      "id": "desk-reset",
+      "title": "One minute desk reset",
+      "viewCount": 742000,
+      "thumb": "linear-gradient(145deg, #1982c4, #6a4c93, #ff99c8)"
+    },
+    {
+      "id": "synth-test",
+      "title": "Pocket synth test",
+      "viewCount": 1200000,
+      "thumb": "linear-gradient(145deg, #2b2d42, #8d99ae, #ef233c)"
+    },
+    {
+      "id": "street-food",
+      "title": "A street food perfect loop",
+      "viewCount": 986000,
+      "thumb": "linear-gradient(145deg, #006d77, #83c5be, #ffddd2)"
+    },
+    {
+      "id": "game-level",
+      "title": "Tiny game level reveal",
+      "viewCount": 521000,
+      "thumb": "linear-gradient(145deg, #386641, #a7c957, #f2e8cf)"
+    },
+    {
+      "id": "travel-bag",
+      "title": "Travel bag in 20 seconds",
+      "viewCount": 2000000,
+      "thumb": "linear-gradient(145deg, #03045e, #00b4d8, #caf0f8)"
+    }
+  ]
+}

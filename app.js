@@ -1,148 +1,43 @@
-const categories = [
-  "All",
-  "Design",
-  "Music",
-  "Gaming",
-  "Podcasts",
-  "Live",
-  "JavaScript",
-  "Cooking",
-  "Travel",
-  "News",
-  "Recently uploaded",
-];
+const api = {
+  async getBootstrap(category = "All", query = "") {
+    const params = new URLSearchParams({ category, query });
+    const response = await fetch(`/api/bootstrap?${params}`);
+    if (!response.ok) throw new Error("API unavailable");
+    return response.json();
+  },
+  async countView(id) {
+    const response = await fetch(`/api/videos/${id}/views`, { method: "POST" });
+    if (!response.ok) throw new Error("View update failed");
+    return response.json();
+  },
+  async likeVideo(id) {
+    const response = await fetch(`/api/videos/${id}/likes`, { method: "POST" });
+    if (!response.ok) throw new Error("Like update failed");
+    return response.json();
+  },
+  async addComment(id, comment) {
+    const response = await fetch(`/api/videos/${id}/comments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(comment),
+    });
+    if (!response.ok) throw new Error("Comment failed");
+    return response.json();
+  },
+};
 
-const videos = [
-  {
-    title: "I rebuilt my entire studio around one tiny desk",
-    channel: "Creator Lab",
-    views: "1.8M views",
-    age: "2 days ago",
-    duration: "12:48",
-    category: "Design",
-    thumb: "linear-gradient(135deg, #203a43, #2c5364 45%, #f9d423)",
-    avatar: "#0ea5e9",
+const fallbackState = {
+  categories: ["All", "Design", "Music", "Gaming", "Podcasts", "Live", "JavaScript", "Cooking", "Travel", "News", "Recently uploaded"],
+  featured: {
+    id: "featured-dashboard",
+    title: "Build Room: Designing a Creator Dashboard",
+    channel: "Creator Lab Live",
+    viewsLabel: "128K watching",
+    thumb: "linear-gradient(155deg, #304f9c 0%, #845ec2 42%, #ff6f59 100%)",
   },
-  {
-    title: "No-code automations that quietly save ten hours a week",
-    channel: "Ops Theory",
-    views: "418K views",
-    age: "5 days ago",
-    duration: "18:05",
-    category: "JavaScript",
-    thumb: "linear-gradient(135deg, #101820, #f2aa4c 58%, #ffffff)",
-    avatar: "#f97316",
-  },
-  {
-    title: "Lo-fi beats for late night edits and clean focus",
-    channel: "Room Tone",
-    views: "6.2M views",
-    age: "1 month ago",
-    duration: "1:02:12",
-    category: "Music",
-    thumb: "linear-gradient(135deg, #14213d, #fca311 52%, #e5e5e5)",
-    avatar: "#8b5cf6",
-  },
-  {
-    title: "Building a tiny city in survival mode",
-    channel: "Block & Build",
-    views: "923K views",
-    age: "3 weeks ago",
-    duration: "24:39",
-    category: "Gaming",
-    thumb: "linear-gradient(135deg, #2d6a4f, #95d5b2 55%, #ffd166)",
-    avatar: "#22c55e",
-  },
-  {
-    title: "What actually happens inside a coffee roastery",
-    channel: "Field Notes",
-    views: "311K views",
-    age: "4 days ago",
-    duration: "9:31",
-    category: "Cooking",
-    thumb: "linear-gradient(135deg, #1b1b1b, #6f4e37 50%, #e0b084)",
-    avatar: "#7c2d12",
-  },
-  {
-    title: "React state patterns explained with real interface problems",
-    channel: "Frontend Desk",
-    views: "782K views",
-    age: "8 days ago",
-    duration: "16:22",
-    category: "JavaScript",
-    thumb: "linear-gradient(135deg, #023047, #219ebc 55%, #ffb703)",
-    avatar: "#0284c7",
-  },
-  {
-    title: "A calm walking tour through Kyoto at sunrise",
-    channel: "Slow Miles",
-    views: "2.1M views",
-    age: "2 weeks ago",
-    duration: "34:10",
-    category: "Travel",
-    thumb: "linear-gradient(135deg, #355070, #eaac8b 50%, #f8edeb)",
-    avatar: "#db2777",
-  },
-  {
-    title: "The practical future of AI assistants at work",
-    channel: "Signal Daily",
-    views: "654K views",
-    age: "13 hours ago",
-    duration: "21:17",
-    category: "News",
-    thumb: "linear-gradient(135deg, #111827, #4f46e5 48%, #06b6d4)",
-    avatar: "#111827",
-  },
-  {
-    title: "Live jam: synthwave set with modular hardware",
-    channel: "Patch Bay",
-    views: "128K watching",
-    age: "Live",
-    duration: "LIVE",
-    category: "Live",
-    thumb: "linear-gradient(135deg, #240046, #ff006e 52%, #ffbe0b)",
-    avatar: "#e11d48",
-  },
-  {
-    title: "Why modern dashboards still feel slow and how to fix them",
-    channel: "Product Systems",
-    views: "234K views",
-    age: "6 days ago",
-    duration: "14:04",
-    category: "Design",
-    thumb: "linear-gradient(135deg, #3a0ca3, #4cc9f0 54%, #f72585)",
-    avatar: "#7c3aed",
-  },
-  {
-    title: "The restaurant prep list that changed my weeknight dinners",
-    channel: "Sharp Knife",
-    views: "1.1M views",
-    age: "1 week ago",
-    duration: "11:28",
-    category: "Cooking",
-    thumb: "linear-gradient(135deg, #283618, #dda15e 52%, #fefae0)",
-    avatar: "#65a30d",
-  },
-  {
-    title: "Deep dive podcast: shipping software without drama",
-    channel: "Release Notes",
-    views: "94K views",
-    age: "Yesterday",
-    duration: "58:43",
-    category: "Podcasts",
-    thumb: "linear-gradient(135deg, #001219, #0a9396 52%, #ee9b00)",
-    avatar: "#0f766e",
-  },
-];
-
-const shorts = [
-  ["Fastest color palette trick", "3.4M views", "linear-gradient(145deg, #ff595e, #ffca3a, #8ac926)"],
-  ["One minute desk reset", "742K views", "linear-gradient(145deg, #1982c4, #6a4c93, #ff99c8)"],
-  ["Pocket synth test", "1.2M views", "linear-gradient(145deg, #2b2d42, #8d99ae, #ef233c)"],
-  ["A street food perfect loop", "986K views", "linear-gradient(145deg, #006d77, #83c5be, #ffddd2)"],
-  ["Tiny game level reveal", "521K views", "linear-gradient(145deg, #386641, #a7c957, #f2e8cf)"],
-  ["Travel bag in 20 seconds", "2M views", "linear-gradient(145deg, #03045e, #00b4d8, #caf0f8)"],
-];
+  videos: [],
+  shorts: [],
+};
 
 const chipsEl = document.querySelector("#chips");
 const gridEl = document.querySelector("#videoGrid");
@@ -153,9 +48,64 @@ const playerModal = document.querySelector("#playerModal");
 const playerScreen = document.querySelector("#playerScreen");
 const playerTitle = document.querySelector("#playerTitle");
 const playerChannel = document.querySelector("#playerChannel");
+const likeButton = document.querySelector("#likeButton");
+const likeCount = document.querySelector("#likeCount");
+const commentCount = document.querySelector("#commentCount");
+const commentsList = document.querySelector("#commentsList");
+const commentForm = document.querySelector("#commentForm");
+const commentName = document.querySelector("#commentName");
+const commentText = document.querySelector("#commentText");
 
+let categories = [];
+let videos = [];
+let shorts = [];
+let featured = null;
 let activeCategory = "All";
 let activeQuery = "";
+let activeVideo = null;
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function compactNumber(value) {
+  if (value >= 1000000) return `${Number((value / 1000000).toFixed(1))}M`;
+  if (value >= 1000) return `${Number((value / 1000).toFixed(1))}K`;
+  return String(value);
+}
+
+function viewLabel(count, live = false) {
+  return `${compactNumber(count)} ${live ? "watching" : "views"}`;
+}
+
+function presentVideo(video) {
+  return {
+    ...video,
+    views: viewLabel(video.viewCount, video.category === "Live"),
+    commentCount: video.comments.length,
+  };
+}
+
+function presentShort(short) {
+  return {
+    ...short,
+    views: viewLabel(short.viewCount),
+  };
+}
+
+function filterFallbackVideos(items) {
+  const query = activeQuery.trim().toLowerCase();
+  return items.filter((video) => {
+    const categoryMatch = activeCategory === "All" || video.category === activeCategory || activeCategory === "Recently uploaded";
+    const queryMatch = [video.title, video.channel, video.category].some((value) => value.toLowerCase().includes(query));
+    return categoryMatch && queryMatch;
+  });
+}
 
 function initials(name) {
   return name
@@ -168,42 +118,65 @@ function initials(name) {
 
 function createThumbnail(video) {
   return `
-    <div class="thumb" style="--thumb-bg: ${video.thumb}">
+    <div class="thumb" style="--thumb-bg: ${escapeHtml(video.thumb)}">
       <div class="visual-block"></div>
       <div class="visual-lines"><span></span><span></span><span></span></div>
-      <span class="duration">${video.duration}</span>
+      <span class="duration">${escapeHtml(video.duration)}</span>
     </div>
   `;
 }
 
-function openPlayer(video) {
+function renderComments(video) {
+  const comments = video.comments || [];
+  commentCount.textContent = `${comments.length} comment${comments.length === 1 ? "" : "s"}`;
+  commentsList.innerHTML = comments.length
+    ? comments
+        .map(
+          (comment) => `
+            <article class="comment">
+              <strong>${escapeHtml(comment.name)}</strong>
+              <p>${escapeHtml(comment.text)}</p>
+            </article>
+          `
+        )
+        .join("")
+    : `<p class="empty-comments">No comments yet.</p>`;
+}
+
+async function openPlayer(video) {
+  activeVideo = video;
   playerScreen.style.setProperty("--thumb-bg", video.thumb);
   playerTitle.textContent = video.title;
-  playerChannel.textContent = `${video.channel} • ${video.views}`;
+  playerChannel.textContent = `${video.channel} - ${video.views || video.viewsLabel}`;
+  likeCount.textContent = compactNumber(video.likes || 0);
+  renderComments(video);
   playerModal.classList.add("open");
   playerModal.setAttribute("aria-hidden", "false");
+
+  if (!video.isShort && !video.isFeatured) {
+    try {
+      const updated = await api.countView(video.id);
+      Object.assign(video, updated);
+      playerChannel.textContent = `${video.channel} - ${video.views}`;
+    } catch {
+      video.viewCount = (video.viewCount || 0) + 1;
+    }
+  }
 }
 
 function renderVideos() {
-  const query = activeQuery.trim().toLowerCase();
-  const visible = videos.filter((video) => {
-    const categoryMatch = activeCategory === "All" || video.category === activeCategory || activeCategory === "Recently uploaded";
-    const queryMatch = [video.title, video.channel, video.category].some((value) => value.toLowerCase().includes(query));
-    return categoryMatch && queryMatch;
-  });
-
-  resultCount.textContent = `${visible.length} video${visible.length === 1 ? "" : "s"}`;
-  gridEl.innerHTML = visible
+  resultCount.textContent = `${videos.length} video${videos.length === 1 ? "" : "s"}`;
+  gridEl.innerHTML = videos
     .map(
       (video) => `
-        <button class="video-card" type="button" data-index="${videos.indexOf(video)}">
+        <button class="video-card" type="button" data-video-id="${escapeHtml(video.id)}">
           ${createThumbnail(video)}
           <footer>
-            <span class="channel-avatar" style="--avatar-bg: ${video.avatar}">${initials(video.channel)}</span>
+            <span class="channel-avatar" style="--avatar-bg: ${escapeHtml(video.avatar)}">${escapeHtml(initials(video.channel))}</span>
             <div class="video-info">
-              <h3 class="video-title">${video.title}</h3>
-              <p class="video-channel">${video.channel}</p>
-              <p class="meta-line"><span>${video.views}</span><span>•</span><span>${video.age}</span></p>
+              <h3 class="video-title">${escapeHtml(video.title)}</h3>
+              <p class="video-channel">${escapeHtml(video.channel)}</p>
+              <p class="meta-line"><span>${escapeHtml(video.views)}</span><span>-</span><span>${escapeHtml(video.age)}</span></p>
             </div>
           </footer>
         </button>
@@ -211,75 +184,133 @@ function renderVideos() {
     )
     .join("");
 
-  if (!visible.length) {
+  if (!videos.length) {
     gridEl.innerHTML = `<p class="empty-state">No videos found. Try a broader search.</p>`;
   }
 }
 
 function renderChips() {
   chipsEl.innerHTML = categories
-    .map((category) => `<button class="chip${category === activeCategory ? " active" : ""}" type="button" data-category="${category}">${category}</button>`)
+    .map((category) => `<button class="chip${category === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`)
     .join("");
 }
 
 function renderShorts() {
   shortsEl.innerHTML = shorts
     .map(
-      ([title, views, thumb], index) => `
-        <button class="short-card" type="button" data-short="${index}">
-          <div class="short-thumb" style="--thumb-bg: ${thumb}"></div>
-          <h3>${title}</h3>
-          <p class="short-meta">${views}</p>
+      (short) => `
+        <button class="short-card" type="button" data-short-id="${escapeHtml(short.id)}">
+          <div class="short-thumb" style="--thumb-bg: ${escapeHtml(short.thumb)}"></div>
+          <h3>${escapeHtml(short.title)}</h3>
+          <p class="short-meta">${escapeHtml(short.views)}</p>
         </button>
       `
     )
     .join("");
 }
 
-chipsEl.addEventListener("click", (event) => {
+async function refreshData() {
+  try {
+    const data = await api.getBootstrap(activeCategory, activeQuery);
+    categories = data.categories;
+    featured = data.featured;
+    videos = data.videos;
+    shorts = data.shorts;
+  } catch {
+    const response = await fetch("data/db.json");
+    const data = response.ok ? await response.json() : fallbackState;
+    categories = data.categories;
+    featured = data.featured;
+    videos = filterFallbackVideos(data.videos || []).map(presentVideo);
+    shorts = (data.shorts || []).map(presentShort);
+  }
+
+  renderChips();
+  renderVideos();
+  renderShorts();
+}
+
+chipsEl.addEventListener("click", async (event) => {
   const chip = event.target.closest(".chip");
   if (!chip) return;
   activeCategory = chip.dataset.category;
-  renderChips();
-  renderVideos();
+  await refreshData();
 });
 
 gridEl.addEventListener("click", (event) => {
   const card = event.target.closest(".video-card");
   if (!card) return;
-  openPlayer(videos[Number(card.dataset.index)]);
+  const video = videos.find((item) => item.id === card.dataset.videoId);
+  if (video) openPlayer(video);
 });
 
 shortsEl.addEventListener("click", (event) => {
   const card = event.target.closest(".short-card");
   if (!card) return;
-  const [title, views, thumb] = shorts[Number(card.dataset.short)];
+  const short = shorts.find((item) => item.id === card.dataset.shortId);
+  if (!short) return;
   openPlayer({
-    title,
+    ...short,
     channel: "Virello Shorts",
-    views,
-    thumb,
+    likes: 0,
+    comments: [],
+    isShort: true,
   });
 });
 
 document.querySelector("#watchFeatured").addEventListener("click", () => {
   openPlayer({
-    title: "Build Room: Designing a Creator Dashboard",
-    channel: "Creator Lab Live",
-    views: "128K watching",
-    thumb: "linear-gradient(155deg, #304f9c 0%, #845ec2 42%, #ff6f59 100%)",
+    ...featured,
+    views: featured.viewsLabel,
+    likes: 0,
+    comments: [],
+    isFeatured: true,
   });
 });
 
-document.querySelector("#searchForm").addEventListener("submit", (event) => {
+document.querySelector("#searchForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   activeQuery = searchInput.value;
-  renderVideos();
+  await refreshData();
 });
 
-searchInput.addEventListener("input", () => {
+searchInput.addEventListener("input", async () => {
   activeQuery = searchInput.value;
-  renderVideos();
+  await refreshData();
+});
+
+likeButton.addEventListener("click", async () => {
+  if (!activeVideo || activeVideo.isShort || activeVideo.isFeatured) return;
+  try {
+    const updated = await api.likeVideo(activeVideo.id);
+    activeVideo.likes = updated.likes;
+  } catch {
+    activeVideo.likes = (activeVideo.likes || 0) + 1;
+  }
+  likeCount.textContent = compactNumber(activeVideo.likes || 0);
+});
+
+commentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activeVideo || activeVideo.isShort || activeVideo.isFeatured) return;
+
+  const payload = {
+    name: commentName.value,
+    text: commentText.value,
+  };
+
+  try {
+    const comment = await api.addComment(activeVideo.id, payload);
+    activeVideo.comments = [comment, ...(activeVideo.comments || [])];
+  } catch {
+    activeVideo.comments = [
+      { id: `local-${Date.now()}`, name: payload.name || "Guest", text: payload.text },
+      ...(activeVideo.comments || []),
+    ];
+  }
+
+  commentText.value = "";
+  renderComments(activeVideo);
 });
 
 document.querySelector("#menuButton").addEventListener("click", () => {
@@ -306,6 +337,4 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-renderChips();
-renderVideos();
-renderShorts();
+refreshData();

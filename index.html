@@ -115,6 +115,21 @@
         <div class="player-meta">
           <h2 id="playerTitle">Video title</h2>
           <p id="playerChannel">Channel</p>
+          <div class="player-actions">
+            <button class="pill-button" id="likeButton" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v10H4V11h3Z" /><path d="M7 11 12 2c1.1.4 1.8 1.6 1.5 2.8L12.7 8H18a3 3 0 0 1 2.9 3.7l-1.5 6A3 3 0 0 1 16.5 20H7" /></svg>
+              <span id="likeCount">0</span>
+            </button>
+            <span class="player-stat" id="commentCount">0 comments</span>
+          </div>
+          <section class="comments-panel" aria-label="Comments">
+            <form class="comment-form" id="commentForm">
+              <input id="commentName" type="text" placeholder="Your name" maxlength="32" />
+              <input id="commentText" type="text" placeholder="Add a comment" maxlength="280" required />
+              <button class="primary-dark-button" type="submit">Post</button>
+            </form>
+            <div class="comments-list" id="commentsList"></div>
+          </section>
         </div>
       </div>
     </div>
