@@ -2,6 +2,10 @@
 
 Virello is a YouTube-style video browsing clone built with plain HTML, CSS, and JavaScript.
 
+## Live Demo
+
+[View the deployed app](https://deepak-kumar002.github.io/Youtube-clone/)
+
 ## Run Locally
 
 ```bash
